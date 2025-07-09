@@ -36,6 +36,12 @@ The extension captures all the requested fields:
 - `website` - Business website
 - `created_at` - Extraction timestamp
 
+## 🚀 Quick Start
+
+**For a 5-minute setup guide, see [`QUICK_START.md`](QUICK_START.md)**
+
+**Having issues? Check [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)**
+
 ## Installation
 
 ### Option 1: Load Unpacked Extension (Development)

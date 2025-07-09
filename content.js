@@ -1,20 +1,72 @@
-// Google Maps Lead Extractor - Content Script
+// Google Maps Lead Extractor - Content Script (Updated 2024)
 class GoogleMapsExtractor {
     constructor() {
         this.extractedLeads = [];
         this.isExtracting = false;
         this.currentQuery = '';
         this.observer = null;
+        this.debugMode = true; // Enable debugging
         this.init();
     }
 
     init() {
+        console.log('🎯 Lead Extractor initializing...');
+        // Wait for page to load completely
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(() => this.setupExtractor(), 2000);
+            });
+        } else {
+            setTimeout(() => this.setupExtractor(), 2000);
+        }
+    }
+
+    setupExtractor() {
         this.createExtractorUI();
         this.setupMessageListener();
         this.observePageChanges();
+        this.debugPageStructure();
+        console.log('✅ Lead Extractor ready!');
+    }
+
+    debugPageStructure() {
+        if (!this.debugMode) return;
+        
+        console.log('🔍 Debugging Google Maps structure...');
+        
+        // Check for different possible selectors
+        const possibleSelectors = [
+            '[data-result-index]',
+            '[jstcache]',
+            '.Nv2PK',
+            '.lI9IFe',
+            '.bfdHYd',
+            '.THOPZb',
+            '[role="article"]',
+            '.qjESne',
+            '.section-result',
+            '.hfpxzc'
+        ];
+
+        possibleSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+                console.log(`✅ Found ${elements.length} elements with selector: ${selector}`);
+            }
+        });
+
+        // Check current URL pattern
+        console.log('📍 Current URL:', window.location.href);
+        console.log('📍 URL Search:', window.location.search);
     }
 
     createExtractorUI() {
+        // Remove existing panel if present
+        const existingPanel = document.getElementById('gmaps-extractor-panel');
+        if (existingPanel) {
+            existingPanel.remove();
+        }
+
         // Create floating UI panel
         const panel = document.createElement('div');
         panel.id = 'gmaps-extractor-panel';
@@ -32,10 +84,12 @@ class GoogleMapsExtractor {
                     <button id="start-extraction" class="primary">Start Extraction</button>
                     <button id="stop-extraction" class="secondary" style="display:none;">Stop</button>
                     <button id="clear-data" class="secondary">Clear</button>
+                    <button id="debug-scan" class="secondary">Debug Scan</button>
                 </div>
                 <div class="progress-bar" style="display:none;">
                     <div class="progress-fill"></div>
                 </div>
+                <div class="debug-info" id="debug-info" style="display:none;"></div>
             </div>
         `;
         
@@ -57,6 +111,58 @@ class GoogleMapsExtractor {
         document.getElementById('clear-data').addEventListener('click', () => {
             this.clearData();
         });
+
+        document.getElementById('debug-scan').addEventListener('click', () => {
+            this.performDebugScan();
+        });
+    }
+
+    performDebugScan() {
+        const debugInfo = document.getElementById('debug-info');
+        debugInfo.style.display = 'block';
+        
+        let foundElements = 0;
+        let debugText = '🔍 Debug Scan Results:<br><br>';
+        
+        // Try different selectors for business listings
+        const selectors = [
+            { name: 'Standard Results', selector: '[data-result-index]' },
+            { name: 'Business Cards', selector: '.hfpxzc' },
+            { name: 'Place Results', selector: '.Nv2PK' },
+            { name: 'Search Results', selector: '.section-result' },
+            { name: 'List Items', selector: '.lI9IFe' },
+            { name: 'Article Elements', selector: '[role="article"]' },
+            { name: 'Result Containers', selector: '.bfdHYd' },
+            { name: 'Place Items', selector: '.qjESne' }
+        ];
+
+        selectors.forEach(({name, selector}) => {
+            const elements = document.querySelectorAll(selector);
+            debugText += `${name}: ${elements.length} found<br>`;
+            foundElements += elements.length;
+            
+            if (elements.length > 0) {
+                // Try to extract a sample business name
+                const firstElement = elements[0];
+                const nameSelectors = [
+                    '.qBF1Pd', 'h3', '.fontHeadlineSmall', '.section-result-title', 
+                    '.section-result-text-content h3', '[data-value="Name"]'
+                ];
+                
+                for (let nameSelector of nameSelectors) {
+                    const nameEl = firstElement.querySelector(nameSelector);
+                    if (nameEl && nameEl.textContent.trim()) {
+                        debugText += `  → Sample: "${nameEl.textContent.trim()}"<br>`;
+                        break;
+                    }
+                }
+            }
+        });
+
+        debugText += `<br>Total elements found: ${foundElements}`;
+        debugInfo.innerHTML = debugText;
+        
+        console.log('Debug scan completed, found elements:', foundElements);
     }
 
     setupMessageListener() {
@@ -69,6 +175,9 @@ class GoogleMapsExtractor {
             } else if (request.action === 'stopExtraction') {
                 this.stopExtraction();
                 sendResponse({ success: true });
+            } else if (request.action === 'clearData') {
+                this.clearData();
+                sendResponse({ success: true });
             }
         });
     }
@@ -76,7 +185,7 @@ class GoogleMapsExtractor {
     observePageChanges() {
         this.observer = new MutationObserver((mutations) => {
             if (this.isExtracting) {
-                this.extractVisibleBusinesses();
+                setTimeout(() => this.extractVisibleBusinesses(), 500);
             }
         });
 
@@ -95,7 +204,12 @@ class GoogleMapsExtractor {
         document.querySelector('.progress-bar').style.display = 'block';
         document.querySelector('.status').textContent = 'Extracting...';
         
+        console.log('🚀 Starting extraction for query:', this.currentQuery);
+        
+        // Initial extraction
         this.extractVisibleBusinesses();
+        
+        // Start auto-scroll
         this.autoScroll();
     }
 
@@ -106,17 +220,33 @@ class GoogleMapsExtractor {
         document.getElementById('stop-extraction').style.display = 'none';
         document.querySelector('.progress-bar').style.display = 'none';
         document.querySelector('.status').textContent = `Extracted ${this.extractedLeads.length} leads`;
+        
+        console.log('⏹️ Extraction stopped. Total leads:', this.extractedLeads.length);
     }
 
     clearData() {
         this.extractedLeads = [];
         this.updateLeadCount();
         document.querySelector('.status').textContent = 'Ready to extract';
+        console.log('🗑️ Data cleared');
     }
 
     getCurrentSearchQuery() {
+        // Try multiple ways to get the search query
         const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('query') || urlParams.get('q') || 'Unknown';
+        let query = urlParams.get('query') || urlParams.get('q');
+        
+        if (!query) {
+            // Try to extract from search input
+            const searchInput = document.querySelector('#searchboxinput') || 
+                              document.querySelector('input[aria-label*="Search"]') ||
+                              document.querySelector('input[placeholder*="Search"]');
+            if (searchInput) {
+                query = searchInput.value;
+            }
+        }
+        
+        return query || 'Unknown Search';
     }
 
     generateUUID() {
@@ -128,78 +258,193 @@ class GoogleMapsExtractor {
     }
 
     extractVisibleBusinesses() {
-        const businessElements = document.querySelectorAll('[data-result-index]');
+        // Try multiple selectors for business elements (Google Maps changes frequently)
+        const selectors = [
+            '.hfpxzc',                    // Current standard selector
+            '[data-result-index]',        // Legacy selector
+            '.Nv2PK',                     // Alternative selector
+            '.section-result',            // Another alternative
+            '.lI9IFe',                    // List item selector
+            '[role="article"]',           // Semantic selector
+            '.qjESne'                     // Place item selector
+        ];
+
+        let businessElements = [];
         
-        businessElements.forEach(element => {
+        for (let selector of selectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+                businessElements = Array.from(elements);
+                console.log(`📍 Found ${businessElements.length} businesses using selector: ${selector}`);
+                break;
+            }
+        }
+
+        if (businessElements.length === 0) {
+            console.log('⚠️ No business elements found with any selector');
+            return;
+        }
+        
+        let newLeadsCount = 0;
+        
+        businessElements.forEach((element, index) => {
             try {
-                const businessData = this.extractBusinessData(element);
+                const businessData = this.extractBusinessData(element, index);
                 if (businessData && !this.isDuplicate(businessData)) {
                     this.extractedLeads.push(businessData);
                     this.updateLeadCount();
+                    newLeadsCount++;
+                    
+                    if (this.debugMode) {
+                        console.log(`✅ Extracted: ${businessData.name}`);
+                    }
                 }
             } catch (error) {
-                console.error('Error extracting business data:', error);
+                console.error('❌ Error extracting business data:', error);
             }
         });
+        
+        if (newLeadsCount > 0) {
+            console.log(`🎉 Extracted ${newLeadsCount} new leads`);
+        }
     }
 
-    extractBusinessData(element) {
+    extractBusinessData(element, index) {
         try {
-            // Extract basic information
-            const nameElement = element.querySelector('[data-value="Name"]') || 
-                              element.querySelector('h3') || 
-                              element.querySelector('.qBF1Pd');
+            // Extract business name using multiple possible selectors
+            const nameSelectors = [
+                '.qBF1Pd',                    // Standard name selector
+                '.fontHeadlineSmall',         // Alternative name selector
+                'h3',                         // Generic heading
+                '.section-result-title',      // Result title
+                '[data-value="Name"]',        // Data attribute
+                '.section-result-text-content h3'
+            ];
             
-            const name = nameElement ? nameElement.textContent.trim() : '';
-            if (!name) return null;
+            let name = '';
+            let nameElement = null;
+            
+            for (let selector of nameSelectors) {
+                nameElement = element.querySelector(selector);
+                if (nameElement && nameElement.textContent.trim()) {
+                    name = nameElement.textContent.trim();
+                    break;
+                }
+            }
+            
+            if (!name) {
+                if (this.debugMode) {
+                    console.log('⚠️ No name found for element:', element);
+                }
+                return null;
+            }
 
-            // Extract rating and reviews
-            const ratingElement = element.querySelector('[data-value="Rating"]') || 
-                                element.querySelector('.MW4etd');
-            const rating = ratingElement ? parseFloat(ratingElement.textContent.replace(',', '.')) : 0;
+            // Extract rating
+            const ratingSelectors = [
+                '.MW4etd',                    // Standard rating
+                '[data-value="Rating"]',      // Data attribute
+                '.fontBodyMedium .Ob2kfd',    // Alternative rating
+                '.section-result-rating'
+            ];
+            
+            let rating = 0;
+            for (let selector of ratingSelectors) {
+                const ratingElement = element.querySelector(selector);
+                if (ratingElement) {
+                    const ratingText = ratingElement.textContent.replace(',', '.');
+                    const ratingMatch = ratingText.match(/\d+\.?\d*/);
+                    if (ratingMatch) {
+                        rating = parseFloat(ratingMatch[0]);
+                        break;
+                    }
+                }
+            }
 
-            const reviewsElement = element.querySelector('.UY7F9') || 
-                                 element.querySelector('[data-value="Reviews"]');
-            const reviews = reviewsElement ? 
-                parseInt(reviewsElement.textContent.replace(/[^\d]/g, '')) || 0 : 0;
+            // Extract review count
+            const reviewSelectors = [
+                '.UY7F9',                     // Standard reviews
+                '[data-value="Reviews"]',     // Data attribute
+                '.fontBodyMedium:has-text("(")', // Alternative reviews
+                '.section-result-num-reviews'
+            ];
+            
+            let reviews = 0;
+            for (let selector of reviewSelectors) {
+                const reviewElement = element.querySelector(selector);
+                if (reviewElement) {
+                    const reviewText = reviewElement.textContent;
+                    const reviewMatch = reviewText.match(/\d+/);
+                    if (reviewMatch) {
+                        reviews = parseInt(reviewMatch[0]);
+                        break;
+                    }
+                }
+            }
 
             // Extract address
-            const addressElement = element.querySelector('[data-value="Address"]') || 
-                                 element.querySelector('.W4Efsd:last-child');
-            const fullAddress = addressElement ? addressElement.textContent.trim() : '';
+            const addressSelectors = [
+                '.W4Efsd:last-child',         // Standard address
+                '[data-value="Address"]',     // Data attribute
+                '.fontBodyMedium[title]',     // Alternative address
+                '.section-result-location'
+            ];
+            
+            let fullAddress = '';
+            for (let selector of addressSelectors) {
+                const addressElement = element.querySelector(selector);
+                if (addressElement && addressElement.textContent.trim()) {
+                    fullAddress = addressElement.textContent.trim();
+                    break;
+                }
+            }
 
-            // Parse address components
-            const addressParts = this.parseAddress(fullAddress);
+            // Extract categories
+            const categorySelectors = [
+                '.W4Efsd:not(:last-child)',   // Standard category
+                '[data-value="Category"]',    // Data attribute
+                '.fontBodyMedium:first-child', // Alternative category
+                '.section-result-details'
+            ];
+            
+            let categories = '';
+            for (let selector of categorySelectors) {
+                const categoryElement = element.querySelector(selector);
+                if (categoryElement && categoryElement.textContent.trim()) {
+                    categories = categoryElement.textContent.trim();
+                    break;
+                }
+            }
 
-            // Extract categories/types
-            const categoryElement = element.querySelector('.W4Efsd:not(:last-child)') || 
-                                  element.querySelector('[data-value="Category"]');
-            const categories = categoryElement ? categoryElement.textContent.trim() : '';
-
-            // Extract URL and domain
-            const linkElement = element.querySelector('a[href*="/maps/place/"]');
-            const url = linkElement ? linkElement.href : '';
+            // Extract URL
+            const linkElement = element.querySelector('a[href*="/maps/place/"]') || 
+                              element.querySelector('a[href*="google.com/maps"]') ||
+                              element.querySelector('a[data-value="directions"]');
+            const url = linkElement ? linkElement.href : window.location.href;
             const domain = url ? new URL(url).hostname : '';
 
             // Extract thumbnail
             const thumbnailElement = element.querySelector('img[src*="googleusercontent.com"]') ||
-                                   element.querySelector('img[src*="maps.gstatic.com"]');
+                                   element.querySelector('img[src*="maps.gstatic.com"]') ||
+                                   element.querySelector('img[src*="streetviewpixels"]');
             const thumbnail = thumbnailElement ? thumbnailElement.src : '';
 
-            // Extract coordinates from URL if available
+            // Extract coordinates from URL
             const coordinates = this.extractCoordinates(url);
 
-            // Extract phone number (if visible)
+            // Extract phone (rarely visible in list view)
             const phoneElement = element.querySelector('[data-value="Phone"]') ||
                                element.querySelector('[href^="tel:"]');
             const phoneNumbers = phoneElement ? phoneElement.textContent.trim() : '';
 
-            // Extract website (if available)
+            // Extract website (rarely visible in list view)
             const websiteElement = element.querySelector('[data-value="Website"]') ||
-                                 element.querySelector('[href^="http"]:not([href*="google.com"])');
+                                 element.querySelector('a[href^="http"]:not([href*="google.com"])');
             const website = websiteElement ? websiteElement.href || websiteElement.textContent : '';
 
-            return {
+            // Parse address components
+            const addressParts = this.parseAddress(fullAddress);
+
+            const businessData = {
                 uuid: this.generateUUID(),
                 query: this.currentQuery,
                 name: name,
@@ -225,8 +470,11 @@ class GoogleMapsExtractor {
                 website: website,
                 created_at: new Date().toISOString()
             };
+
+            return businessData;
+
         } catch (error) {
-            console.error('Error in extractBusinessData:', error);
+            console.error('❌ Error in extractBusinessData:', error);
             return null;
         }
     }
@@ -245,10 +493,20 @@ class GoogleMapsExtractor {
     extractCoordinates(url) {
         const coords = { lat: 0, lng: 0 };
         if (url) {
-            const coordMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
-            if (coordMatch) {
-                coords.lat = parseFloat(coordMatch[1]);
-                coords.lng = parseFloat(coordMatch[2]);
+            // Try different coordinate patterns
+            const coordPatterns = [
+                /@(-?\d+\.?\d*),(-?\d+\.?\d*)/,          // Standard @lat,lng
+                /!3d(-?\d+\.?\d*)!4d(-?\d+\.?\d*)/,      // Alternative format
+                /center=(-?\d+\.?\d*),(-?\d+\.?\d*)/      // Center parameter
+            ];
+
+            for (let pattern of coordPatterns) {
+                const coordMatch = url.match(pattern);
+                if (coordMatch) {
+                    coords.lat = parseFloat(coordMatch[1]);
+                    coords.lng = parseFloat(coordMatch[2]);
+                    break;
+                }
             }
         }
         return coords;
@@ -271,22 +529,59 @@ class GoogleMapsExtractor {
     autoScroll() {
         if (!this.isExtracting) return;
 
-        const scrollContainer = document.querySelector('[role="main"]') || 
-                              document.querySelector('.m6QErb') ||
-                              document.querySelector('[data-value="Search results"]');
+        // Try multiple scroll container selectors
+        const scrollSelectors = [
+            '[role="main"]',
+            '.m6QErb',
+            '.section-scrollbox',
+            '.section-result-container',
+            '[data-value="Search results"]',
+            '.siAUzd',
+            '.section-layout'
+        ];
+
+        let scrollContainer = null;
+        for (let selector of scrollSelectors) {
+            scrollContainer = document.querySelector(selector);
+            if (scrollContainer) {
+                console.log(`📜 Found scroll container: ${selector}`);
+                break;
+            }
+        }
         
         if (scrollContainer) {
-            scrollContainer.scrollTop += 300;
-            setTimeout(() => this.autoScroll(), 2000);
+            scrollContainer.scrollTop += 400;
+            console.log('📜 Auto-scrolling...');
+        } else {
+            // Fallback to window scroll
+            window.scrollBy(0, 400);
+            console.log('📜 Window scrolling...');
         }
+
+        // Continue scrolling
+        setTimeout(() => this.autoScroll(), 3000);
     }
 }
 
 // Initialize the extractor when the page loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        new GoogleMapsExtractor();
-    });
-} else {
-    new GoogleMapsExtractor();
+console.log('🎯 Google Maps Lead Extractor loaded');
+
+// Wait for page to be ready
+function initializeExtractor() {
+    if (window.location.href.includes('google.com/maps') || window.location.href.includes('maps.google.com')) {
+        console.log('✅ On Google Maps, initializing extractor...');
+        window.googleMapsExtractor = new GoogleMapsExtractor();
+    } else {
+        console.log('❌ Not on Google Maps');
+    }
 }
+
+// Multiple initialization attempts
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeExtractor);
+} else {
+    initializeExtractor();
+}
+
+// Also try after a short delay
+setTimeout(initializeExtractor, 3000);

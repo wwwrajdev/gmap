@@ -141,6 +141,31 @@
     }
 }
 
+.debug-info {
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.debug-info::-webkit-scrollbar {
+    width: 4px;
+}
+
+.debug-info::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.debug-info::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 2px;
+}
+
 /* Animation for panel appearance */
 #gmaps-extractor-panel {
     animation: slideInFromRight 0.3s ease-out;
