@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="56" fill="#4285f4" stroke="#ffffff" stroke-width="4"/>
+  
+  <!-- Map pin -->
+  <path d="M64 20 C50 20 40 30 40 44 C40 58 64 84 64 84 C64 84 88 58 88 44 C88 30 78 20 64 20 Z" fill="#ffffff"/>
+  
+  <!-- Inner circle of pin -->
+  <circle cx="64" cy="44" r="8" fill="#4285f4"/>
+  
+  <!-- Target circles -->
+  <circle cx="64" cy="64" r="35" fill="none" stroke="#34a853" stroke-width="2" opacity="0.7"/>
+  <circle cx="64" cy="64" r="25" fill="none" stroke="#34a853" stroke-width="2" opacity="0.5"/>
+  <circle cx="64" cy="64" r="15" fill="none" stroke="#34a853" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Center dot -->
+  <circle cx="64" cy="64" r="3" fill="#ea4335"/>
+</svg>
